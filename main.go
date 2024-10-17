@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net"
-	"os"
+	"strings"
 )
 
 func main() {
@@ -28,15 +27,28 @@ func main() {
 
 		val, err := resp.Read()
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			fmt.Println("error reading from client: ", err.Error())
-			os.Exit(1)
+			return
+		}
+		if val.typ != "array" {
+			fmt.Println("Invalid request, expected array")
+			continue
+		}
+		if len(val.array) == 0 {
+			fmt.Println("Invalid request, expected array length > 0")
 		}
 
-		fmt.Println(val)
+		command := strings.ToUpper(val.array[0].bulk)
+		args := val.array[1:]
+
 		writer := NewWriter(conn)
-		writer.Write(Value{typ: "string", str: "OK"})
+		handler, ok := Handlers[command]
+		if !ok {
+			fmt.Println("Invalid command: ", command)
+			writer.Write(Value{typ: "string", str: ""})
+			continue
+		}
+
+		writer.Write(handler(args))
 	}
 }
